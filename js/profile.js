@@ -1,7 +1,7 @@
 // js/profile.js — 트레이너 카드
 import { auth, db } from "./firebase.js";
 import { supabase, AVATAR_BUCKET } from "./supabase.js";
-import { POKEMON_KO } from "./data/pokemonKo.js";
+import { POKEMON_KO, POKEMON_FORMS_KO } from "./data/pokemonKo.js";
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { syncPublicProfile, loadPublicProfile } from "./publicProfile.js";
@@ -18,7 +18,9 @@ const TYPE_KO = {
 };
 
 const normalize = (s) => s.replace(/\s+/g, "").toLowerCase();
-const ID_BY_NAME = new Map(POKEMON_KO.map(([id, name]) => [normalize(name), id]));
+// 검색 대상: [PokeAPI pokemon id, 이름, 전국도감 번호] — 리전폼은 id 가 10000번대
+const ALL_POKEMON = [...POKEMON_KO.map(([id, name]) => [id, name, id]), ...POKEMON_FORMS_KO];
+const ID_BY_NAME = new Map(ALL_POKEMON.map(([id, name]) => [normalize(name), id]));
 
 const spriteUrl = (id) =>
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
@@ -212,11 +214,11 @@ function searchPokemon(query) {
   if (!q) return [];
   if (/^\d+$/.test(q)) {
     const n = Number(q);
-    return POKEMON_KO.filter(([id]) => id === n || String(id).startsWith(q)).slice(0, MAX_RESULTS);
+    return ALL_POKEMON.filter(([, , dex]) => dex === n || String(dex).startsWith(q)).slice(0, MAX_RESULTS);
   }
   const starts = [];
   const contains = [];
-  for (const row of POKEMON_KO) {
+  for (const row of ALL_POKEMON) {
     const name = normalize(row[1]);
     if (name.startsWith(q)) starts.push(row);
     else if (name.includes(q)) contains.push(row);
@@ -237,14 +239,14 @@ function renderResults() {
     searchResults.append(el("p", "hint", "검색 결과 없음"));
     return;
   }
-  for (const [id, name] of rows) {
+  for (const [id, name, dex] of rows) {
     const btn = el("button", "result");
     btn.type = "button";
     const img = el("img", "sprite");
     img.src = spriteUrl(id);
     img.alt = "";
     img.loading = "lazy";
-    btn.append(img, el("span", null, name), el("small", null, `No.${String(id).padStart(4, "0")}`));
+    btn.append(img, el("span", null, name), el("small", null, `No.${String(dex).padStart(4, "0")}`));
     btn.addEventListener("click", () => {
       saveSlot(editingSlot, { id, name });
       dialog.close();
